@@ -74,13 +74,13 @@ int main(int argc, char **argv)
   	double vx; // speed of the motors
     double vy;
     
+    long quality=0;
    double originCol=0;
    double originRow=0;
    double r=0;
    
 int accOrigin[600][600]={0};//[row][col]
     std::vector<Point*> pastSun; 
-
    
 	if (loadScenario(0)!= 0){
 		std::cout<<" Error configuring AVC server"<<std::endl;
@@ -92,7 +92,7 @@ int accOrigin[600][600]={0};//[row][col]
     long int t = 0; // current time
     const sf::Time TTime   = sf::seconds(0.5f);
     
-    //OpenPPMFile("cameraView.ppm", output);
+    OpenPPMFile("cameraView.ppm", output);
 
     
     while ((globalWindow.isOpen())&&(t<1000))
@@ -126,9 +126,9 @@ int accOrigin[600][600]={0};//[row][col]
 				 	 pnt->row=row;
 				 	 pnt->col=col;
 				 	 points.push_back(pnt);
-				 	 //if(points.size()>15){
-					//	 points.erase(points.begin());
-					 //}
+				 	 if(points.size()>15){
+						 points.erase(points.begin());
+					}
 				  }
 			
 			}
@@ -167,34 +167,34 @@ checked.push_back(pnt1);
 			if(points.size()>10){//if there are enough points: use averages to find sun position:  then use this to make votes for the center of rotation
 			float centerCol = (averageCol*1.0)/(numUsed*1.0);
 			float centerRow= (averageRow*1.0)/(numUsed*1.0);
-
-		
-std::vector<Point*> checked;
-
-
-	if(pastSun.size()>5){pastSun.erase(pastSun.begin());}
-		for(Point* pnt1 : pastSun){//for each permutation: find the center of rotation (using current sun as third point):
-		for(Point* pnt2 : pastSun){
-			if(pnt1==pnt2){continue;}
-			if(std::count(checked.begin(), checked.end(), pnt2)){continue;}//check if second value has already been first value
-			Point* center = findCenter(    pnt1->row,  pnt1->col,     pnt2->row, pnt2->col,    centerRow, centerCol);//uses 3 points on circumeference to find center of rotation
 			
-			if(center->row<cameraView.height    &    center->row>=0    &    center->col<cameraView.width    &    center->col>=0){//useful to remove error messages when set pixels  on lower part of circle (beyond image)
-			accOrigin[(int)center->row][(int)center->col]++;
-
-			//set_pixel(output,pnt1->centerRow,  pnt1->centerCol, 0,255,0);							
-			//set_pixel(output,center->row,  center->col, 0,0,255);
-			}
-}
-checked.push_back(pnt1);
-}
 	Point* currentValue = new Point;
 	currentValue->col =centerCol;
 	currentValue->row=centerRow;
 pastSun.push_back(currentValue);
 
+std::vector<Point*> checked;
+
+
+	if(pastSun.size()>15){pastSun.erase(pastSun.begin());}
+		for(Point* pnt1 : pastSun){//for each permutation: find the center of rotation (using current sun as third point):
+		for(Point* pnt2 : pastSun){
+			if(pnt1==pnt2){continue;}
+			if(std::count(checked.begin(), checked.end(), pnt2)){continue;}//check if second value has already been first value
+					Point* center = findCenter(    pnt1->row,  pnt1->col,     pnt2->row, pnt2->col,    centerRow, centerCol);//uses 3 points on circumeference to find center of rotation
+			
+			if(center->row<cameraView.height    &    center->row>=0    &    center->col<cameraView.width    &    center->col>=0){//useful to remove error messages when set pixels  on lower part of circle (beyond image)
+			accOrigin[(int)center->row][(int)center->col]+=(int)((numUsed*1.0)/100.0);
+}
+checked.push_back(pnt1);
+		}
+}
+
+
 
 int max = 0;
+float guessCol=0;
+float guessRow=0;
 for(int row=1; row<cameraView.height-1; row++){//find center of rotation ->  coord with most votes
 	for(int col=1; col<cameraView.width-1; col++){
 		if(accOrigin[row][col]>max){
@@ -204,20 +204,26 @@ for(int row=1; row<cameraView.height-1; row++){//find center of rotation ->  coo
 			}
 		}
 }
-//set_pixel(output,originRow,  originCol, 255,0,0);
-			r = findRadius(centerRow, centerCol, originRow, originCol); //sets radius (does not take old radius into account);
+
+set_pixel(output,originRow,  originCol, 255,0,0);
+			//r = r*((quality*1.0)/(quality*1.0+numUsed*1.0))     +    findRadius(centerRow, centerCol, originRow, originCol)*((numUsed*1.0)/(quality*1.0+numUsed*1.0)); 
+			r = findRadius(centerRow, centerCol, originRow, originCol); 
+			//quality =quality*((quality*1.0)/(quality*1.0+numUsed*1.0))   +    numUsed*((numUsed*1.0)/(quality*1.0+numUsed*1.0));
+//std::cout<<"r="<<(r*((quality*1.0)/(quality*1.0+numUsed*1.0)))<<"    +    "<<findRadius(centerRow, centerCol, originRow, originCol)*((numUsed*1.0)/(quality*1.0+numUsed*1.0)) <<std::endl;
+//std::cout<<"quality="<<(quality*((quality*1.0)/(quality*1.0+numUsed*1.0)) )<<"    +    "<<( numUsed*((numUsed*1.0)/(quality*1.0+numUsed*1.0))) <<std::endl;
+
 
 }//if
 
 
-/*
+
 for(float testT=0; testT<125; testT+=1){//draws the current circle out on to image
 	Point* hello = sunPosition(r, testT, originCol, originRow);
-	//set_pixel(output, hello->row, hello->col, 0,0,255);
+	set_pixel(output, hello->row, hello->col, 0,0,255);
 	}
-*/
 
-std::cout<<"r="<<r<<" originCol="<<originCol<<" originRow="<<originRow<<std::endl;//prints calculated values
+
+std::cout<<"r="<<r<<"     originCol="<<originCol<<"    originRow="<<originRow<<"    quality="<<quality<<std::endl;//prints calculated values
 
 /* does nothing for now */
 double xPosition, yPosition;
@@ -235,8 +241,10 @@ if(sunPos->row>=600){
 
 aim.loc.x = sunPos->col;
 	aim.loc.y = sunPos->row;
-	//SavePPMFile("gradients.ppm", output);
-    }
+	SavePPMFile("gradients.ppm", output);
+	
+	std::cout<<"      x/col="<<aim.loc.x<<"      y/row="<<aim.loc.y<<std::endl;
+    }//while running
     
     return EXIT_SUCCESS;
 }
